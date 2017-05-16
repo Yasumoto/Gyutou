@@ -86,3 +86,8 @@ func processChefResponse(data: Data?, response: URLResponse?, error: Error?) -> 
     }
     sema.signal()
 }
+
+@available(OSX 10.12, *)
+public func retrieveNodeAttributes(nodeName: String) throws {
+    try sendChefRequest(path: "nodes/\(nodeName)")
+}
