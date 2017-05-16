@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "Gyutou"
+    name: "Gyutou",
     dependencies: [
         .Package(url: "https://github.com/krzyzanowskim/CryptoSwift", majorVersion: 0, minor: 6),
     ]
