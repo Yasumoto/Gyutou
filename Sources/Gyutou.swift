@@ -11,8 +11,10 @@ let chefAuthorizationHeaderTemplate = "X-Ops-Authorization-"
 
 @available(OSX 10.12, *)
 public class GyutouClient {
-    var sema = DispatchSemaphore(value: 0)
-    var jsonOutput: Any?
+    public var sema = DispatchSemaphore(value: 0)
+    public var jsonOutput: Any?
+
+    public init() { }
 
     func sendChefRequest(path: String, body: String = "") throws {
         /*
