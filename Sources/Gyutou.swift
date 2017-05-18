@@ -11,12 +11,11 @@ let chefAuthorizationHeaderTemplate = "X-Ops-Authorization-"
 
 @available(OSX 10.12, *)
 public class GyutouClient {
-    public var sema = DispatchSemaphore(value: 0)
-    public var jsonOutput: Any?
+    var sema = DispatchSemaphore(value: 0)
 
     public init() { }
 
-    func sendChefRequest(path: String, body: String = "") throws {
+    func sendChefRequest(path: String, body: String = "") throws -> Any? {
         /*
          The docs at https://docs.chef.io/auth.html#other-options were quite helpful
          https://chef.github.io/chef-rfc/rfc065-sign-v1.3.html Gave more detail
@@ -70,31 +69,50 @@ public class GyutouClient {
             request.setValue(NSUserName(), forHTTPHeaderField: "X-Ops-UserId")
 
             let session = URLSession(configuration: URLSessionConfiguration.default)
-            let task = session.dataTask(with: request, completionHandler: processChefResponse)
+            let data: Data?
+            let response: URLResponse?
+            let responseError: Error?
+            var jsonOutput: Any?
+            let task = session.dataTask(with: request) {
+                if let responded = $1 {
+                    print("The response was: \(responded)")
+                }
+                if let responseError = $2 {
+                    print("Error: \(responseError)")
+                    print("Code: \(responseError._code)")
+                } else if let data = $0 {
+                    do {
+                        let output = try JSONSerialization.jsonObject(with: data, options: .allowFragments)
+                        jsonOutput = output
+
+                    } catch {
+                        print("Warning, did not receive valid JSON!\n\(error)")
+                    }
+                }
+                self.sema.signal()
+            }
             task.resume()
+            sema.wait()
+            return jsonOutput
         }
+        return nil;
     }
 
     func processChefResponse(data: Data?, response: URLResponse?, error: Error?) -> Void {
-        if let responded = response {
-            print("The response was: \(responded)")
-        }
-        if let errored = error {
-            print("Error: \(errored)")
-            print("Code: \(errored._code)")
-        } else if let dataz = data {
-            do {
-                let output = try JSONSerialization.jsonObject(with: dataz, options: .allowFragments)
-                jsonOutput = output
 
-            } catch {
-                print("Warning, did not receive valid JSON!\n\(error)")
-            }
-        }
-        sema.signal()
     }
 
-    public func retrieveNodeAttributes(nodeName: String) throws {
-        try sendChefRequest(path: "nodes/\(nodeName)")
+    public func retrieveNodeAttributes(nodeName: String) throws -> Any? {
+        if let response = try sendChefRequest(path: "nodes/\(nodeName)") {
+            return response
+        }
+        return nil
+    }
+
+    public func nodeList() throws -> [String]? {
+        if let response = try sendChefRequest(path: "nodes") {
+            return response as? [String]
+        }
+        return nil
     }
 }
