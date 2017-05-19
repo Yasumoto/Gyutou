@@ -110,8 +110,8 @@ public class GyutouClient {
     }
 
     public func nodeList() throws -> [String]? {
-        if let response = try sendChefRequest(path: "nodes") {
-            return response as? [String]
+        if let response = try sendChefRequest(path: "nodes") as? [String:String] {
+            return Array(response.keys)
         }
         return nil
     }
