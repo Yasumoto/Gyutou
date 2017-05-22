@@ -5,6 +5,7 @@ import CryptoSwift
 
 enum GyutouError: Error {
     case signingKeyError(message: String)
+    case improperChefURLError
 }
 
 let chefAuthorizationHeaderTemplate = "X-Ops-Authorization-"
@@ -15,27 +16,55 @@ public class GyutouClient {
 
     public init() { }
 
-    func sendChefRequest(path: String, body: String = "") throws -> Any? {
+    func createEndpointURL(urlPath: String, organizationName: String? = nil) -> String{
+        var endpoint: String
+        if let orgName = organizationName {
+            endpoint = "/organizations/\(orgName)/\(urlPath)"
+        } else {
+            endpoint = "/\(urlPath)"
+        }
+        return endpoint
+    }
+
+    func generateChefURL(server: String, path: String, parameters: [String:String]? = nil) throws -> URLRequest {
+        var parameterString = "?"
+        if let params = parameters {
+            for (key, value) in params {
+                if parameterString.characters.count > 1 {
+                    parameterString.append("&")
+                }
+                parameterString.append("\(key)=\(value)")
+            }
+        }
+        if parameterString.characters.count == 1 {
+            parameterString = ""
+        }
+
+        guard let serverUrl = URL(string: "\(server)\(path)\(parameterString)") else { throw GyutouError.improperChefURLError }
+        return URLRequest(url: serverUrl)
+    }
+
+    func createCanonicalRequestData(endpoint: String, hashedBody: String, timestamp: String) -> CFData {
+        let hashedPath = Data(bytes: Digest.sha1(Array(endpoint.utf8))).base64EncodedString()
+        let canonicalRequest = "Method:GET\nHashed Path:\(hashedPath)\nX-Ops-Content-Hash:\(hashedBody)\nX-Ops-Timestamp:\(timestamp)\nX-Ops-UserId:\(NSUserName())"
+
+        return canonicalRequest.data(using: String.Encoding.utf8)! as CFData
+    }
+
+    func sendChefRequest(path: String, body: String = "", parameters: Dictionary<String, String>? = nil) throws -> Any? {
         /*
          The docs at https://docs.chef.io/auth.html#other-options were quite helpful
          https://chef.github.io/chef-rfc/rfc065-sign-v1.3.html Gave more detail
          */
         let configuration = knifeConfigurationContents()
 
-        if let server = configuration.serverUrl, let serverUrl = URL(string: "\(server)\(path)") {
+        if let server = configuration.serverUrl {
             let timestamp = ISO8601DateFormatter().string(from: Date())
-            let endpoint: String
-            if let orgName = configuration.organizationName {
-                endpoint = "/organizations/\(orgName)/\(path)"
-            } else {
-                endpoint = "/\(path)"
-            }
-            let hashedPath = Data(bytes: Digest.sha1(Array(endpoint.utf8))).base64EncodedString()
+            let endpoint = createEndpointURL(urlPath: path, organizationName: configuration.organizationName)
             let hashedBody = Data(bytes: Digest.sha1(Array(body.utf8))).base64EncodedString()
-            let canonicalRequest = "Method:GET\nHashed Path:\(hashedPath)\nX-Ops-Content-Hash:\(hashedBody)\nX-Ops-Timestamp:\(timestamp)\nX-Ops-UserId:\(NSUserName())"
+            let canonicalRequestData = createCanonicalRequestData(endpoint: endpoint, hashedBody: hashedBody, timestamp: timestamp)
 
-            let canonicalRequestData = canonicalRequest.data(using: String.Encoding.utf8)! as CFData
-            var request = URLRequest(url: serverUrl)
+            var request = try generateChefURL(server: server, path: path, parameters: parameters)
 
             let key = try readPrivateKey(fileName: KnifeConfiguration().pemFile)
             // Thanks to https://developer.apple.com/library/content/documentation/Security/Conceptual/CertKeyTrustProgGuide/Signing.html#//apple_ref/doc/uid/TP40001358-CH213-SW1
@@ -74,9 +103,10 @@ public class GyutouClient {
             let responseError: Error?
             var jsonOutput: Any?
             let task = session.dataTask(with: request) {
+                /* Useful for debugging
                 if let responded = $1 {
                     print("The response was: \(responded)")
-                }
+                }*/
                 if let responseError = $2 {
                     print("Error: \(responseError)")
                     print("Code: \(responseError._code)")
@@ -98,10 +128,6 @@ public class GyutouClient {
         return nil;
     }
 
-    func processChefResponse(data: Data?, response: URLResponse?, error: Error?) -> Void {
-
-    }
-
     public func retrieveNodeAttributes(nodeName: String) throws -> Any? {
         if let response = try sendChefRequest(path: "nodes/\(nodeName)") {
             return response
@@ -114,5 +140,21 @@ public class GyutouClient {
             return Array(response.keys)
         }
         return nil
+    }
+
+    public func searchNode(query: String) throws -> [String] {
+        var hostnames = [String]()
+        if let response = try sendChefRequest(path: "search/node", parameters: ["q": query]) as? [String: Any] {
+            if let rows = response["rows"] as? Array<Any> {
+                for row in rows {
+                    if let node = row as? [String: Any] {
+                        if let name = node["name"] {
+                            hostnames.append(String(describing: name))
+                        }
+                    }
+                }
+            }
+        }
+        return hostnames
     }
 }
