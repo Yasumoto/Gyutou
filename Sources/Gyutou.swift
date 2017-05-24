@@ -6,6 +6,8 @@ import CryptoSwift
 enum GyutouError: Error {
     case signingKeyError(message: String)
     case improperChefURLError
+    case poorlyFormattedSearchString
+    case unknownChefResponseFormat
 }
 
 let chefAuthorizationHeaderTemplate = "X-Ops-Authorization-"
@@ -104,9 +106,9 @@ public class GyutouClient {
             var jsonOutput: Any?
             let task = session.dataTask(with: request) {
                 /* Useful for debugging
-                if let responded = $1 {
-                    print("The response was: \(responded)")
-                }*/
+                 if let responded = $1 {
+                 print("The response was: \(responded)")
+                 }*/
                 if let responseError = $2 {
                     print("Error: \(responseError)")
                     print("Code: \(responseError._code)")
@@ -144,15 +146,21 @@ public class GyutouClient {
 
     public func searchNode(query: String) throws -> [String] {
         var hostnames = [String]()
-        if let response = try sendChefRequest(path: "search/node", parameters: ["q": query]) as? [String: Any] {
-            if let rows = response["rows"] as? Array<Any> {
-                for row in rows {
-                    if let node = row as? [String: Any] {
-                        if let name = node["name"] {
-                            hostnames.append(String(describing: name))
-                        }
-                    }
+        guard let queryString = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else { throw GyutouError.poorlyFormattedSearchString }
+        var start = 0
+        var total = 1
+        while hostnames.count < total {
+        if let response = try sendChefRequest(path: "search/node", parameters: ["q": queryString, "start": "\(start)"]) as? [String: Any] {
+            guard let returnedTotal = response["total"] as? Int else { throw GyutouError.unknownChefResponseFormat }
+            total = returnedTotal
+            guard let rows = response["rows"] as? Array<Any> else { throw GyutouError.unknownChefResponseFormat }
+            for row in rows {
+                guard let node = row as? [String: Any] else { throw GyutouError.unknownChefResponseFormat }
+                if let name = node["name"] {
+                    hostnames.append(String(describing: name))
                 }
+            }
+                start = hostnames.count
             }
         }
         return hostnames
