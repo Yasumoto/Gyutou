@@ -15,8 +15,18 @@ let chefAuthorizationHeaderTemplate = "X-Ops-Authorization-"
 @available(OSX 10.12, *)
 public class GyutouClient {
     var sema = DispatchSemaphore(value: 0)
+    let configuration: ChefConfiguration
+    let key: SecKey
 
-    public init() { }
+    public init() throws {
+        self.configuration = knifeConfigurationContents()
+        self.key = try readPrivateKey(fileName: KnifeConfiguration().pemFile)
+    }
+
+    public init(serverURL: String, organizationName: String, pemString: String) throws {
+        self.configuration =  ChefConfiguration(clientKey: nil, validationKey: nil, serverUrl: serverURL, organizationName: organizationName)
+        self.key = try parsePrivateKey(pemString)
+    }
 
     func createEndpointURL(urlPath: String, organizationName: String? = nil) -> String{
         var endpoint: String
@@ -58,7 +68,6 @@ public class GyutouClient {
          The docs at https://docs.chef.io/auth.html#other-options were quite helpful
          https://chef.github.io/chef-rfc/rfc065-sign-v1.3.html Gave more detail
          */
-        let configuration = knifeConfigurationContents()
 
         if let server = configuration.serverUrl {
             let timestamp = ISO8601DateFormatter().string(from: Date())
@@ -68,7 +77,6 @@ public class GyutouClient {
 
             var request = try generateChefURL(server: server, path: path, parameters: parameters)
 
-            let key = try readPrivateKey(fileName: KnifeConfiguration().pemFile)
             // Thanks to https://developer.apple.com/library/content/documentation/Security/Conceptual/CertKeyTrustProgGuide/Signing.html#//apple_ref/doc/uid/TP40001358-CH213-SW1
             var error: Unmanaged<CFError>?
             if let encryptedCoreData = SecKeyCreateSignature(key, SecKeyAlgorithm.rsaSignatureDigestPKCS1v15Raw, canonicalRequestData, &error) {
