@@ -1,10 +1,21 @@
-// swift-tools-version:3.1
+// swift-tools-version:4.0
 
 import PackageDescription
 
 let package = Package(
     name: "Gyutou",
+    products: [
+        .executable(name: "main", targets: ["Gyutou"]),
+        .library(name: "Gyutou", targets: ["Gyutou"])
+    ],
     dependencies: [
-        .Package(url: "https://github.com/krzyzanowskim/CryptoSwift", majorVersion: 0, minor: 6),
+        .package(url: "https://github.com/berenjena-power/CryptoSwift", .branch("swift4"))
+    ],
+    targets: [
+        .target(
+            name: "Gyutou",
+            dependencies: ["CryptoSwift"],
+            path: "Sources"
+        )
     ]
 )

@@ -17,6 +17,7 @@ public class GyutouClient {
     var sema = DispatchSemaphore(value: 0)
     let configuration: ChefConfiguration
     let key: SecKey
+    let session = URLSession(configuration: URLSessionConfiguration.default)
 
     public init() throws {
         self.configuration = knifeConfigurationContents()
@@ -107,14 +108,13 @@ public class GyutouClient {
             request.setValue(timestamp, forHTTPHeaderField: "X-Ops-Timestamp")
             request.setValue(NSUserName(), forHTTPHeaderField: "X-Ops-UserId")
 
-            let session = URLSession(configuration: URLSessionConfiguration.default)
             let data: Data?
             let response: URLResponse?
             let responseError: Error?
             var jsonOutput: Any?
             let task = session.dataTask(with: request) {
-                /* Useful for debugging
-                 if let responded = $1 {
+                //Useful for debugging
+                 /*if let responded = $1 {
                  print("The response was: \(responded)")
                  }*/
                 if let responseError = $2 {
