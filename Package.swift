@@ -5,7 +5,6 @@ import PackageDescription
 let package = Package(
     name: "Gyutou",
     products: [
-        .executable(name: "main", targets: ["Gyutou"]),
         .library(name: "Gyutou", targets: ["Gyutou"])
     ],
     dependencies: [
