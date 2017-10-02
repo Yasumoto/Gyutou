@@ -3,11 +3,11 @@
     "pins": [
       {
         "package": "CryptoSwift",
-        "repositoryURL": "https://github.com/berenjena-power/CryptoSwift",
+        "repositoryURL": "https://github.com/krzyzanowskim/CryptoSwift",
         "state": {
-          "branch": "swift4",
-          "revision": "95a8c7511fca277242fbaa66e7e7b30ddc93f49e",
-          "version": null
+          "branch": null,
+          "revision": "daafe952bf379bc176d6970cf52bb3747d264fcb",
+          "version": "0.7.2"
         }
       }
     ]
