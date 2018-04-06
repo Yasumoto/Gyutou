@@ -43,13 +43,13 @@ public class GyutouClient {
         var parameterString = "?"
         if let params = parameters {
             for (key, value) in params {
-                if parameterString.characters.count > 1 {
+                if parameterString.count > 1 {
                     parameterString.append("&")
                 }
                 parameterString.append("\(key)=\(value)")
             }
         }
-        if parameterString.characters.count == 1 {
+        if parameterString.count == 1 {
             parameterString = ""
         }
 
@@ -84,11 +84,11 @@ public class GyutouClient {
                 let encryptedData = encryptedCoreData as Data
                 let encodedData = encryptedData.base64EncodedString()
                 var iteration = 1
-                while (iteration - 1) * 60 < encodedData.characters.count {
+                while (iteration - 1) * 60 < encodedData.count {
                     var headerString = ""
                     for i in 0..<60 {
                         let index = i + ((iteration - 1) * 60)
-                        if index < encodedData.characters.count {
+                        if index < encodedData.count {
                             headerString.append(encodedData[encodedData.index(encodedData.startIndex, offsetBy: index)])
                         } else {
                             break
@@ -108,15 +108,12 @@ public class GyutouClient {
             request.setValue(timestamp, forHTTPHeaderField: "X-Ops-Timestamp")
             request.setValue(NSUserName(), forHTTPHeaderField: "X-Ops-UserId")
 
-            let data: Data?
-            let response: URLResponse?
-            let responseError: Error?
             var jsonOutput: Any?
             let task = session.dataTask(with: request) {
                 //Useful for debugging
-                 /*if let responded = $1 {
-                 print("The response was: \(responded)")
-                 }*/
+                /*if let responded = $1 {
+                    print("The response was: \(responded)")
+                }*/
                 if let responseError = $2 {
                     print("Error: \(responseError)")
                     print("Code: \(responseError._code)")
