@@ -55,9 +55,3 @@ func parsePrivateKey(_ pemString: String) throws -> SecKey {
     }
     return key
 }
-
-@available(OSX 10.12, *)
-func readPrivateKey(fileName: String) throws -> SecKey {
-    let keyString = try String(contentsOf: URL(fileURLWithPath: fileName), encoding: .ascii)
-    return try parsePrivateKey(keyString)
-}

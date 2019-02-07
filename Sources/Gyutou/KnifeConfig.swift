@@ -8,16 +8,31 @@
 
 import Foundation
 
+public enum ConfigError: Error {
+    case noClientKeyPathDefined
+    case noConfigFound
+    case pemKeyError
+}
+
 struct ChefConfiguration {
-    var clientKey: String?
+    var clientKeyPath: String?
     var validationKey: String?
     var serverUrl: String?
     var organizationName: String?
+    var signingKey: SecKey
 }
 
 struct KnifeConfiguration {
-    let filePath = "/Users/\(NSUserName())/.chef/knife.rb"
-    let pemFile = "/Users/\(NSUserName())/.chef/\(NSUserName()).pem"
+    let localPemFile = "/Users/\(NSUserName())/.chef/\(NSUserName()).pem"
+}
+
+func readRemoteFile(hostname: String, path: String) -> String? {
+    let task = Process()
+    task.launchPath = "/usr/bin/ssh"
+    task.arguments = [hostname, "cat \(path)"]
+    task.launch()
+    task.waitUntilExit()
+    return task.standardOutput as? String
 }
 
 func parseStringFormat(value: String) -> String {
@@ -28,26 +43,53 @@ func parseStringFormat(value: String) -> String {
     return content
 }
 
-func knifeConfigurationContents() -> ChefConfiguration {
-    var clientKey: String? = nil
-    var validationKey: String? = nil
-    var serverUrl: String? = nil
-    var organizationName: String? = nil
-    let knifeConfig = KnifeConfiguration()
-    if let data = FileManager.default.contents(atPath: knifeConfig.filePath),
-        let txt = NSString(data: data, encoding: String.Encoding.utf8.rawValue) {
-        for line in txt.components(separatedBy: "\n") {
-            if line.contains("client_key") {
-                clientKey = parseStringFormat(value:  line)
-            } else if line.contains("validation_key") {
-                validationKey = parseStringFormat(value: line)
-            } else if line.contains("chef_server_url") {
-                serverUrl = parseStringFormat(value: line)
-                if serverUrl!.contains("organization") {
-                    organizationName = serverUrl!.components(separatedBy: "/").filter { $0 != "" }[3]
-                }
+func retrieveConfigFile(hostname: String? = nil) -> String? {
+    if let data = FileManager.default.contents(atPath: "/Users/\(NSUserName())/.chef/knife.rb"),
+        let txt = String(data: data, encoding: .utf8) {
+        return txt
+    }
+    if let hostname = hostname {
+        return readRemoteFile(hostname: hostname, path: "~/.chef/knife.rb")
+    }
+    return nil
+}
+
+@available(OSX 10.12, *)
+func retrievePrivateKey(path: String, hostname: String?) throws -> SecKey {
+    var keyString = try? String(contentsOf: URL(fileURLWithPath: path), encoding: .ascii)
+    if keyString == nil && hostname != nil {
+        keyString = readRemoteFile(hostname: hostname!, path: path)
+    }
+    if keyString == nil {
+        throw ConfigError.pemKeyError
+    }
+    return try parsePrivateKey(keyString!)
+}
+
+@available(OSX 10.12, *)
+func knifeConfigurationContents(hostname: String? = nil) throws -> ChefConfiguration? {
+    var clientKeyPath: String?
+    var validationKey: String?
+    var serverUrl: String?
+    var organizationName: String?
+    guard let configFile = retrieveConfigFile() else {
+        throw ConfigError.noConfigFound
+    }
+    for line in configFile.components(separatedBy: "\n") {
+        if line.contains("client_key") {
+            clientKeyPath = parseStringFormat(value:  line)
+        } else if line.contains("validation_key") {
+            validationKey = parseStringFormat(value: line)
+        } else if line.contains("chef_server_url") {
+            serverUrl = parseStringFormat(value: line)
+            if serverUrl!.contains("organization") {
+                organizationName = serverUrl!.components(separatedBy: "/").filter { $0 != "" }[3]
             }
         }
     }
-    return ChefConfiguration(clientKey: clientKey, validationKey: validationKey, serverUrl: serverUrl, organizationName: organizationName)
+    if clientKeyPath == nil {
+        throw ConfigError.noClientKeyPathDefined
+    }
+    let signingKey = try retrievePrivateKey(path: clientKeyPath!, hostname: hostname )
+    return ChefConfiguration(clientKeyPath: clientKeyPath, validationKey: validationKey, serverUrl: serverUrl, organizationName: organizationName, signingKey: signingKey)
 }

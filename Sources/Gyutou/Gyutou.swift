@@ -4,6 +4,7 @@ import Security
 import CryptoSwift
 
 enum GyutouError: Error {
+    case configurationError
     case signingKeyError(message: String)
     case improperChefURLError
     case poorlyFormattedSearchString
@@ -16,17 +17,13 @@ let chefAuthorizationHeaderTemplate = "X-Ops-Authorization-"
 public class GyutouClient {
     var sema = DispatchSemaphore(value: 0)
     let configuration: ChefConfiguration
-    let key: SecKey
     let session = URLSession(configuration: URLSessionConfiguration.default)
 
-    public init() throws {
-        self.configuration = knifeConfigurationContents()
-        self.key = try readPrivateKey(fileName: KnifeConfiguration().pemFile)
-    }
-
-    public init(serverURL: String, organizationName: String, pemString: String) throws {
-        self.configuration =  ChefConfiguration(clientKey: nil, validationKey: nil, serverUrl: serverURL, organizationName: organizationName)
-        self.key = try parsePrivateKey(pemString)
+    public init(hostname: String? = nil) throws {
+        guard let configuration = try? knifeConfigurationContents(hostname: hostname) else {
+            throw GyutouError.configurationError
+        }
+        self.configuration = configuration!
     }
 
     func createEndpointURL(urlPath: String, organizationName: String? = nil) -> String{
@@ -80,7 +77,7 @@ public class GyutouClient {
 
             // Thanks to https://developer.apple.com/library/content/documentation/Security/Conceptual/CertKeyTrustProgGuide/Signing.html#//apple_ref/doc/uid/TP40001358-CH213-SW1
             var error: Unmanaged<CFError>?
-            if let encryptedCoreData = SecKeyCreateSignature(key, SecKeyAlgorithm.rsaSignatureDigestPKCS1v15Raw, canonicalRequestData, &error) {
+            if let encryptedCoreData = SecKeyCreateSignature(configuration.signingKey, SecKeyAlgorithm.rsaSignatureDigestPKCS1v15Raw, canonicalRequestData, &error) {
                 let encryptedData = encryptedCoreData as Data
                 let encodedData = encryptedData.base64EncodedString()
                 var iteration = 1
