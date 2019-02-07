@@ -72,7 +72,7 @@ func knifeConfigurationContents(hostname: String? = nil) throws -> ChefConfigura
     var validationKey: String?
     var serverUrl: String?
     var organizationName: String?
-    guard let configFile = retrieveConfigFile() else {
+    guard let configFile = retrieveConfigFile(hostname: hostname) else {
         throw ConfigError.noConfigFound
     }
     for line in configFile.components(separatedBy: "\n") {
