@@ -22,17 +22,18 @@ struct ChefConfiguration {
     var signingKey: SecKey
 }
 
-struct KnifeConfiguration {
-    let localPemFile = "/Users/\(NSUserName())/.chef/\(NSUserName()).pem"
-}
-
 func readRemoteFile(hostname: String, path: String) -> String? {
     let task = Process()
     task.launchPath = "/usr/bin/ssh"
     task.arguments = [hostname, "cat \(path)"]
     task.launch()
     task.waitUntilExit()
-    return task.standardOutput as? String
+    if let stdout = task.standardOutput as? FileHandle {
+        return String(data: stdout.availableData, encoding: .utf8)
+    } else if let stdout = task.standardOutput as? Pipe {
+        return String(data: stdout.fileHandleForReading.availableData, encoding: .utf8)
+    }
+    return nil
 }
 
 func parseStringFormat(value: String) -> String {
