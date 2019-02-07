@@ -26,12 +26,12 @@ func readRemoteFile(hostname: String, path: String) -> String? {
     let task = Process()
     task.launchPath = "/usr/bin/ssh"
     task.arguments = [hostname, "cat \(path)"]
+    let stdout = Pipe()
+    task.standardOutput = stdout
     task.launch()
     task.waitUntilExit()
-    if let stdout = task.standardOutput as? FileHandle {
-        return String(data: stdout.availableData, encoding: .utf8)
-    } else if let stdout = task.standardOutput as? Pipe {
-        return String(data: stdout.fileHandleForReading.availableData, encoding: .utf8)
+    if let stdout = task.standardOutput as? Pipe {
+        return String(data: stdout.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
     }
     return nil
 }
@@ -41,6 +41,7 @@ func parseStringFormat(value: String) -> String {
     content = content.replacingOccurrences(of: "\"", with: "")
     content = content.replacingOccurrences(of: "#{ENV['", with: "$")
     content = content.replacingOccurrences(of: "']}", with: "")
+    content = content.replacingOccurrences(of: "\'", with: "")
     return content
 }
 
